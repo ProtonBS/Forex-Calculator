@@ -15,7 +15,7 @@ A web-based tool that calculates the number of trades required to reach a desire
 1. Clone the repository:
 
     ```bash
-    git clone https://github.com/your-username/trade-calculator.git
+    https://github.com/ProtonBS/Forex-Calculator/
     ```
 
 2. Navigate to the project directory:
