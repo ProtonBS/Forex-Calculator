@@ -6,7 +6,6 @@
     <title>Forex Trade Calculator</title>
     <script defer data-domain="cforex.vercel.app" src="https://plausible.io/js/script.js"></script>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
         .week-divider {
             border-top: 2px solid #4A5568; /* Custom color for week divider */
@@ -81,15 +80,7 @@
             <span class="ml-2 text-sm text-gray-300">Exclude NFP Fridays</span>
         </div>
         <div id="result" class="mt-6 text-center text-lg font-bold"></div>
-        <div id="tradeBreakdown" class="mt-6">
-            <h2 class="text-2xl font-bold mb-4 text-center">Trades Breakdown</h2>
-            <div class="text-center mb-4">
-                <button id="downloadPDFButton" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">Download PDF</button>
-            </div>
-            <div class="overflow-x-auto">
-                <!-- Table will be generated here -->
-            </div>
-        </div>
+        <div id="tradeBreakdown" class="mt-6"></div>
     </div>
     <script>
         function getNextTradeDate(currentDate, excludeNFP) {
@@ -162,60 +153,122 @@
             const tradeBreakdown = document.getElementById('tradeBreakdown');
             tradeBreakdown.innerHTML = `
                 <h2 class="text-2xl font-bold mb-4 text-center">Trades Breakdown</h2>
-                <div class="text-center mb-4">
-                    <button id="downloadPDFButton" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">Download PDF</button>
-    </div>
-    <div class="overflow-x-auto">
-        <table class="min-w-full bg-gray-800 text-gray-100">
-            <thead>
-                <tr>
-                    <th class="px-4 py-2 border-b-2 border-gray-700">Date</th>
-                    <th class="px-4 py-2 border-b-2 border-gray-700">Initial Capital</th>
-                    <th class="px-4 py-2 border-b-2 border-gray-700">Risk Amount</th>
-                    <th class="px-4 py-2 border-b-2 border-gray-700">Result</th>
-                    <th class="px-4 py-2 border-b-2 border-gray-700">Final Capital</th>
-                </tr>
-            </thead>
-            <tbody>
-            ${tradeResults.map((trade, index) => `
-                                            ${index % 5 === 0 && index !== 0 ? `<tr class="week-divider"></tr>` : ''}
-                                <tr>
-                                    <td class="px-4 py-2 border-b border-gray-700">${formatDate(trade.date)}</td>
-                                    <td class="px-4 py-2 border-b border-gray-700">$${trade.initialCapital.toFixed(2)}</td>
-                                    <td class="px-4 py-2 border-b border-gray-700">$${trade.riskAmount.toFixed(2)}</td>
-                                    <td class="px-4 py-2 border-b border-gray-700">${trade.result}</td>
-                                    <td class="px-4 py-2 border-b border-gray-700">$${trade.finalCapital.toFixed(2)}</td>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full bg-gray-800 rounded-lg">
+                        <thead>
+                            <tr>
+                                <th class="px-4 py-2 text-left text-sm font-semibold text-gray-300">Date</th>
+                                <th class="px-4 py-2 text-left text-sm font-semibold text-gray-300">Initial Capital ($)</th>
+                                <th class="px-4 py-2 text-left text-sm font-semibold text-gray-300">Risk per Trade ($)</th>
+                                <th class="px-4 py-2 text-left text-sm font-semibold text-gray-300">Result</th>
+                                <th class="px-4 py-2 text-left text-sm font-semibold text-gray-300">Final Capital ($)</th>
+                                <th class="px-4 py-2 text-left text-sm font-semibold text-gray-300">Week</th>
+                            </tr>
+                                               </thead>
+                        <tbody>
+                            ${tradeResults.map((trade, index) => `
+                                <tr class="${index > 0 && tradeResults[index - 1].date.getDay() === 5 ? 'week-divider' : ''}">
+                                    <td class="border-t border-gray-700 px-4 py-2">${formatDate(trade.date)}</td>
+                                    <td class="border-t border-gray-700 px-4 py-2">$${trade.initialCapital.toFixed(2)}</td>
+                                    <td class="border-t border-gray-700 px-4 py-2">$${(trade.riskAmount).toFixed(2)}</td>
+                                    <td class="border-t border-gray-700 px-4 py-2">
+                                        <span class="${trade.result === 'W' ? 'text-green-500' : 'text-red-500'} font-bold">${trade.result}</span>
+                                    </td>
+                                    <td class="border-t border-gray-700 px-4 py-2">$${trade.finalCapital.toFixed(2)}</td>
+                                    <td class="border-t border-gray-700 px-4 py-2">${Math.ceil((index + 1) / 5)}</td>
                                 </tr>
                             `).join('')}
                         </tbody>
                     </table>
                 </div>
             `;
-
-            // Attach the event listener for the PDF download button
-            document.getElementById('downloadPDFButton').addEventListener('click', () => {
-                const { jsPDF } = window.jspdf;
-                const doc = new jsPDF();
-                
-                doc.setFontSize(22);
-                doc.text("Trades Breakdown", 14, 20);
-
-                const tradeBreakdownContent = document.getElementById('tradeBreakdown').innerHTML;
-                
-                doc.html(tradeBreakdownContent, {
-                    callback: function (doc) {
-                        doc.save('trades-breakdown.pdf');
-                    },
-                    x: 10,
-                    y: 30,
-                    html2canvas: {
-                        scale: 2
-                    }
-                });
-            });
         }
 
-        document.getElementById('calculateButton').addEventListener('click', calculateTrades);
+        // Function to calculate trades and update results
+        function calculateAndDisplayResults() {
+            const initialCapital = parseFloat(document.getElementById('initialCapital').value);
+            const desiredAmount = parseFloat(document.getElementById('desiredAmount').value);
+            const riskRewardRatioInput = document.getElementById('riskRewardRatio').value;
+            const winRate = parseFloat(document.getElementById('winRate').value) / 100;
+            const riskPerTrade = parseFloat(document.getElementById('riskPerTrade').value) / 100;
+            const excludeNFP = document.getElementById('excludeNFP').checked;
+
+            const [risk, reward] = riskRewardRatioInput.split(':').map(Number);
+            const riskRewardRatio = reward / risk;
+
+            let currentCapital = initialCapital;
+            let trades = 0;
+            const tradeResults = [];
+            let currentDate = new Date();
+            const startDate = new Date(currentDate);
+
+            while (currentCapital < desiredAmount) {
+                trades++;
+                const initialCapitalBeforeTrade = currentCapital;
+                const riskAmount = initialCapitalBeforeTrade * riskPerTrade;
+                const win = Math.random() < winRate;
+                if (win) {
+                    currentCapital += riskAmount * riskRewardRatio;
+                    tradeResults.push({ date: new Date(currentDate), initialCapital: initialCapitalBeforeTrade, riskAmount, result: 'W', finalCapital: currentCapital });
+                } else {
+                    currentCapital -= riskAmount;
+                    tradeResults.push({ date: new Date(currentDate), initialCapital: initialCapitalBeforeTrade, riskAmount, result: 'L', finalCapital: currentCapital });
+                }
+                if (currentCapital <= 0) {
+                    document.getElementById('result').textContent = "You will run out of capital before reaching your desired amount.";
+                    return;
+                }
+                currentDate = getNextTradeDate(currentDate, excludeNFP);
+            }
+
+            const daysTaken = Math.ceil((currentDate - startDate) / (1000 * 60 * 60 * 24));
+            const weeksTaken = Math.ceil(daysTaken / 7);
+            const monthsTaken = Math.ceil(daysTaken / 30);
+
+            document.getElementById('result').innerHTML = `It will take approximately <span class="neon-glow">${trades} trades / ${daysTaken} Days / ${weeksTaken} Weeks / ${monthsTaken} Months</span> to flip '$${initialCapital}' into '$${desiredAmount}' and the date will be: ${formatDate(currentDate)}.`;
+            
+            const tradeBreakdown = document.getElementById('tradeBreakdown');
+            tradeBreakdown.innerHTML = `
+                <h2 class="text-2xl font-bold mb-4 text-center">Trades Breakdown</h2>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full bg-gray-800 rounded-lg">
+                        <thead>
+                            <tr>
+                                <th class="px-4 py-2 text-left text-sm font-semibold text-gray-300">Date</th>
+                                <th class="px-4 py-2 text-left text-sm font-semibold text-gray-300">Initial Capital ($)</th>
+                                <th class="px-4 py-2 text-left text-sm font-semibold text-gray-300">Risk per Trade ($)</th>
+                                <th class="px-4 py-2 text-left text-sm font-semibold text-gray-300">Result</th>
+                                <th class="px-4 py-2 text-left text-sm font-semibold text-gray-300">Final Capital ($)</th>
+                                <th class="px-4 py-2 text-left text-sm font-semibold text-gray-300">Week</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${tradeResults.map((trade, index) => `
+                                <tr class="${index > 0 && tradeResults[index - 1].date.getDay() === 5 ? 'week-divider' : ''}">
+                                    <td class="border-t border-gray-700 px-4 py-2">${formatDate(trade.date)}</td>
+                                    <td class="border-t border-gray-700 px-4 py-2">$${trade.initialCapital.toFixed(2)}</td>
+                                    <td class="border-t border-gray-700 px-4 py-2">$${(trade.riskAmount).toFixed(2)}</td>
+                                    <td class="border-t border-gray-700 px-4 py-2">
+                                        <span class="${trade.result === 'W' ? 'text-green-500' : 'text-red-500'} font-bold">${trade.result}</span>
+                                    </td>
+                                    <td class="border-t border-gray-700 px-4 py-2">$${trade.finalCapital.toFixed(2)}</td>
+                                    <td class="border-t border-gray-700 px-4 py-2">${Math.ceil((index + 1) / 5)}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        }
+
+        // Initial calculation when page loads
+        calculateAndDisplayResults();
+
+        // Event listener for the calculate button
+        document.getElementById('calculateButton').addEventListener('click', calculateAndDisplayResults);
+
+        // Event listener for the excludeNFP checkbox
+        document.getElementById('excludeNFP').addEventListener('change', calculateAndDisplayResults);
     </script>
 </body>
 </html>
